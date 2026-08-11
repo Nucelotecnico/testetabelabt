@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cálculo de Demanda BT — ND-5.2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy-deep: #0c1826;
+  --navy: #10233a;
+  --navy-panel: #142c47;
+  --navy-panel-hi: #1a3454;
+  --line: #24486f;
+  --line-soft: #1c3555;
+  --copper: #ff8f4d;
+  --copper-dim: #c96a34;
+  --teal: #5fd8c4;
+  --text: #eef4fb;
+  --text-mute: #8ea3c2;
+  --text-dim: #5c7295;
+  --danger: #ff6b6b;
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--navy-deep);
+  color: var(--text);
+  font-family: var(--font-body);
+  min-height: 100vh;
+}
+
+.blueprint-grid {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--line-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+  background-size: 34px 34px;
+  opacity: 0.35;
+  mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, black 40%, transparent 90%);
+}
+
+.app-header {
+  position: relative;
+  z-index: 1;
+  border-bottom: 1px solid var(--line);
+  padding: 28px 24px 22px;
+  background: linear-gradient(180deg, var(--navy) 0%, var(--navy-deep) 100%);
+}
+.header-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.header-mark { flex: none; filter: drop-shadow(0 0 10px rgba(255,143,77,0.45)); }
+.header-text h1 {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  margin: 0 0 4px;
+}
+.header-text p {
+  margin: 0;
+  color: var(--text-mute);
+  font-size: 13.5px;
+  max-width: 640px;
+}
+
+.tabs {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  background: var(--navy-deep);
+  border-bottom: 1px solid var(--line);
+  padding: 0 16px;
+}
+.tab-btn {
+  flex: none;
+  background: transparent;
+  border: none;
+  color: var(--text-mute);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 14px 16px 12px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--copper); border-bottom-color: var(--copper); }
+
+.app-main {
+  position: relative;
+  z-index: 1;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 28px 20px 60px;
+}
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; animation: fadein 0.25s ease; }
+@keyframes fadein { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+.mult-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--navy-panel);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--copper);
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 18px;
+  font-size: 13px;
+  color: var(--text-mute);
+}
+.mult-bar label { flex: 1; }
+
+.calc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.group-card {
+  background: var(--navy-panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px 14px 10px;
+}
+.group-card.wide { grid-column: 1 / -1; }
+.group-title {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--teal);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--line);
+}
+
+.input-table { width: 100%; border-collapse: collapse; }
+.input-table th {
+  text-align: left;
+  font-size: 10.5px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+  padding: 4px 6px;
+}
+.input-table td { padding: 4px 6px; }
+.rowlabel { font-size: 12.5px; color: var(--text-mute); white-space: nowrap; }
+
+.cell-input, .cell-select {
+  width: 100%;
+  background: var(--navy-deep);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.cell-input:focus, .cell-select:focus {
+  border-color: var(--copper);
+  box-shadow: 0 0 0 3px rgba(255,143,77,0.15);
+}
+.cell-select { appearance: none; cursor: pointer; }
+
+.result-panel {
+  background: var(--navy);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px 18px 20px;
+  margin-bottom: 16px;
+}
+.result-header {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text);
+  margin-bottom: 14px;
+}
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.result-item {
+  background: var(--navy-panel);
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.result-item span { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em; }
+.result-item b { font-family: var(--font-mono); font-size: 15px; color: var(--text); }
+
+.demand-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  background: linear-gradient(90deg, rgba(255,143,77,0.12), transparent);
+  border: 1px solid var(--copper-dim);
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 14px;
+}
+.demand-total span { font-size: 12.5px; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.03em; }
+.demand-total strong { font-family: var(--font-mono); font-size: 22px; color: var(--copper); }
+
+.sizing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.sizing-item {
+  background: var(--navy-panel-hi);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sizing-item span { font-size: 10.5px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em; }
+.sizing-item b { font-family: var(--font-mono); font-size: 13px; color: var(--teal); }
+.sizing-empty { color: var(--text-dim); font-size: 12.5px; grid-column: 1/-1; }
+.sizing-warn {
+  grid-column: 1/-1;
+  font-size: 12px;
+  color: var(--danger);
+  background: rgba(255,107,107,0.08);
+  border: 1px solid rgba(255,107,107,0.3);
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+
+.tot-breakdown { display: flex; flex-direction: column; gap: 6px; }
+.tot-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 4px;
+  border-bottom: 1px dashed var(--line-soft);
+  font-size: 13px;
+}
+.tot-row span { color: var(--text-mute); }
+.tot-row b { font-family: var(--font-mono); color: var(--text); }
+
+.tables-intro { color: var(--text-mute); font-size: 13px; margin-bottom: 16px; }
+.ref-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+.ref-table-card {
+  background: var(--navy-panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+}
+.ref-table-scroll { max-height: 260px; overflow-y: auto; }
+.ref-table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 11.5px; }
+.ref-table th {
+  position: sticky; top: 0;
+  background: var(--navy-panel);
+  text-align: left;
+  color: var(--text-dim);
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--line);
+}
+.ref-table td { padding: 3px 6px; color: var(--text-mute); border-bottom: 1px solid var(--line-soft); }
+.ref-table tr:hover td { color: var(--text); }
+
+.app-footer {
+  position: relative;
+  z-index: 1;
+  border-top: 1px solid var(--line);
+  padding: 18px 24px 30px;
+  text-align: center;
+}
+.app-footer p { color: var(--text-dim); font-size: 11.5px; max-width: 640px; margin: 0 auto; }
+
+@media (max-width: 640px) {
+  .header-text h1 { font-size: 21px; }
+  .result-grid, .sizing-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+::-webkit-scrollbar { height: 8px; width: 8px; }
+::-webkit-scrollbar-track { background: var(--navy-deep); }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+
+</style>
+</head>
+<body>
+<div class="blueprint-grid"></div>
+
+<header class="app-header">
+  <div class="header-inner">
+    <div class="header-mark">
+      <svg width="34" height="34" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 2 L6 18 H15 L13 32 L28 13 H18 L18 2Z" fill="var(--copper)" stroke="var(--copper)" stroke-width="1"/>
+      </svg>
+    </div>
+    <div class="header-text">
+      <h1>Cálculo de Demanda BT</h1>
+      <p>Dimensionamento de entrada de energia conforme norma ND-5.2 — condomínios, escolas, lojas, clínicas e apartamentos</p>
+    </div>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn active" data-tab="cd">Condomínio</button>
+  <button class="tab-btn" data-tab="escolas">Escolas</button>
+  <button class="tab-btn" data-tab="ljesl">Lojas &amp; Salas</button>
+  <button class="tab-btn" data-tab="clinicas">Clínicas</button>
+  <button class="tab-btn" data-tab="apto">Apartamentos</button>
+  <button class="tab-btn" data-tab="total">Total</button>
+  <button class="tab-btn" data-tab="tabelas">Tabelas de referência</button>
+</nav>
+
+<main class="app-main">
+  <section id="panel_cd" class="tab-panel active"></section>
+  <section id="panel_escolas" class="tab-panel"></section>
+  <section id="panel_ljesl" class="tab-panel"></section>
+  <section id="panel_clinicas" class="tab-panel"></section>
+  <section id="panel_apto" class="tab-panel"></section>
+
+  <section id="panel_total" class="tab-panel">
+    <div class="calc-grid">
+      <div class="group-card wide">
+        <div class="group-title">Demanda por unidade</div>
+        <div id="tot_breakdown" class="tot-breakdown"></div>
+      </div>
+    </div>
+
+    <div class="result-panel">
+      <div class="result-header">Demanda total — com condomínio</div>
+      <div class="demand-total"><span>Todas unidades + condomínio</span><strong id="tot_com">0,00 kVA</strong></div>
+      <div class="sizing-grid" id="tot_com_sizing"></div>
+    </div>
+
+    <div class="result-panel">
+      <div class="result-header">Demanda total — sem condomínio</div>
+      <div class="demand-total"><span>Todas unidades, sem condomínio</span><strong id="tot_sem">0,00 kVA</strong></div>
+      <div class="sizing-grid" id="tot_sem_sizing"></div>
+    </div>
+
+    <div class="result-panel">
+      <div class="result-header">Simulador — dimensionar por demanda avulsa</div>
+      <div class="mult-bar"><label for="sim_kva">Demanda (kVA)</label>${""}
+        <input class="cell-input" style="width:120px" type="text" inputmode="decimal" id="sim_kva" value="29.95">
+      </div>
+      <div class="sizing-grid" id="sim_sizing"></div>
+    </div>
+  </section>
+
+  <section id="panel_tabelas" class="tab-panel"></section>
+</main>
+
+<footer class="app-footer">
+  <p>Réplica em HTML/CSS/JS da planilha de cálculo de demandas BT. Valores e tabelas conforme norma ND-5.2. Ferramenta de apoio — sempre valide com a concessionária local.</p>
+</footer>
+
+<script>
+const TABLES = {"AB": [[1, 1], [2, 0.92], [3, 0.84], [4, 0.76], [5, 0.7], [6, 0.65], [7, 0.6], [8, 0.57], [9, 0.54], [10, 0.52], [11, 0.49], [12, 0.48], [13, 0.46], [14, 0.45], [15, 0.44], [16, 0.43], [17, 0.42], [18, 0.41], [19, 0.4], [20, 0.4], [21, 0.39], [22, 0.39], [23, 0.39], [24, 0.38], [25, 0.38], [26, 0.37], [27, 0.37], [28, 0.37], [29, 0.37], [30, 0.37], [31, 0.36], [32, 0.36], [33, 0.36], [34, 0.36], [35, 0.36], [36, 0.36], [37, 0.36], [38, 0.36], [39, 0.36], [40, 0.36], [41, 0.35], [42, 0.35], [43, 0.35], [44, 0.35], [45, 0.35], [46, 0.35], [47, 0.35], [48, 0.35], [49, 0.35], [50, 0.35], [51, 0.34], [52, 0.34], [53, 0.34], [54, 0.34], [55, 0.34], [56, 0.34], [57, 0.34], [58, 0.34], [59, 0.34], [60, 0.34]], "EF": [[1, 1], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1], [7, 1], [8, 1], [9, 1], [10, 1], [10, 1], [10, 1], [10, 1], [10, 1], [10, 1], [10, 1], [11, 0.86], [12, 0.86], [13, 0.86], [14, 0.86], [15, 0.86], [16, 0.86], [17, 0.86], [18, 0.86], [19, 0.86], [20, 0.86], [21, 0.8], [22, 0.8], [23, 0.8], [24, 0.8], [25, 0.8], [26, 0.8], [27, 0.8], [28, 0.8], [29, 0.8], [30, 0.8], [31, 0.78], [32, 0.78], [33, 0.78], [34, 0.78], [35, 0.78], [36, 0.78], [37, 0.78], [38, 0.78], [39, 0.78], [40, 0.78], [41, 0.75], [42, 0.75], [43, 0.75], [44, 0.75], [45, 0.75], [46, 0.75], [47, 0.75], [48, 0.75], [49, 0.75], [50, 0.75], [51, 0.7], [52, 0.7], [53, 0.7], [54, 0.7], [55, 0.7], [56, 0.7], [57, 0.7], [58, 0.7], [59, 0.7], [60, 0.7], [61, 0.7], [62, 0.7], [63, 0.7], [64, 0.7], [65, 0.7], [66, 0.7], [67, 0.7], [68, 0.7], [69, 0.7], [70, 0.7], [71, 0.7], [72, 0.7], [73, 0.7], [74, 0.7], [75, 0.7], [76, 0.65], [77, 0.65], [78, 0.65], [79, 0.65], [80, 0.65], [81, 0.65], [82, 0.65], [83, 0.65], [84, 0.65], [85, 0.65], [86, 0.65], [87, 0.65], [88, 0.65], [89, 0.65], [90, 0.65], [91, 0.65], [92, 0.65], [93, 0.65], [94, 0.65], [95, 0.65], [96, 0.65], [97, 0.65], [98, 0.65], [99, 0.65], [100, 0.65]], "IJKLMN": [["1/4'", 0.39, 0.62, 0.5, 0.43, 0.37], ["1/3'", 0.52, 0.73, 0.58, 0.51, 0.44], ["1/2'", 0.66, 0.92, 0.74, 0.64, 0.55], ["3/4'", 0.89, 1.24, 0.99, 0.87, 0.74], ["1'", 1.1, 1.49, 1.19, 1.04, 0.89], ["1,5'", 1.58, 1.93, 1.54, 1.35, 1.16], ["2'", 2.07, 2.44, 1.95, 1.71, 1.46], ["3'", 3.07, 3.2, 2.56, 2.24, 1.92], ["4'", 3.98, 4.15, 3.32, 2.91, 2.49], ["5'", 4.91, 5.22, 4.18, 3.65, 3.13], ["7,5'", 7.46, 7.94, 6.35, 5.56, 4.76], ["10'", 9.44, 10.04, 8.03, 7.03, 6.02], ["12,5'", 12.1, 13.01, 10.41, 9.11, 7.81]], "QRSTUV": [["1/6'", 0.25, 0.37, 0.3, 0.26, 0.22], ["1/4'", 0.33, 0.48, 0.38, 0.34, 0.29], ["1/3'", 0.41, 0.56, 0.45, 0.39, 0.34], ["1/2'", 0.57, 0.72, 0.58, 0.5, 0.43], ["3/4'", 0.82, 1.08, 0.86, 0.76, 0.65], ["1'", 1.13, 1.38, 1.1, 0.97, 0.83], ["1,5'", 1.58, 2.03, 1.62, 1.42, 1.22], ["2'", 1.94, 2.4, 1.92, 1.68, 1.44], ["3'", 2.91, 3.64, 2.91, 2.55, 2.18], ["4'", 3.82, 4.96, 3.97, 3.47, 2.98], ["5'", 4.78, 5.62, 4.5, 3.93, 3.37], ["6'", 5.45, 6.49, 5.19, 4.54, 3.89], ["7,5'", 6.9, 8.12, 6.5, 5.68, 4.87], ["10'", 9.68, 10.76, 8.61, 7.53, 6.46], ["12,5'", 11.79, 13.25, 10.6, 9.28, 7.95], ["15'", 13.63, 14.98, 11.98, 10.49, 8.99], ["20'", 18.4, 20.67, 16.54, 14.47, 12.4], ["25'", 22.44, 24.66, 19.73, 17.26, 14.8], ["30'", 26.93, 29.59, 23.67, 20.71, 17.76], ["50'", 44.34, 49.27, 23.67, 20.71, 17.76], ["60'", 51.35, 57.7, 23.67, 20.71, 17.76], ["75'", 62.73, 70.48, 23.67, 20.71, 17.76]], "YZAA": [[1, 0.8, 1], [2, 0.75, 1], [3, 0.7, 0.8], [4, 0.66, 0.65], [5, 0.62, 0.55], [6, 0.59, 0.5], [7, 0.56, 0.45], [8, 0.53, 0.43], [9, 0.51, 0.4], [10, 0.49, 0.36], [11, 0.47, 0.35], [12, 0.45, 0.34]], "AEAF": [[1, 3.88], [2, 3.88], [3, 3.88], [4, 3.88], [5, 4.84], [6, 5.8], [7, 6.76], [8, 7.72], [9, 8.68], [10, 9.64], [11, 10.42], [12, 11.2], [13, 11.98], [14, 12.76], [15, 13.54], [16, 14.32], [17, 15.1], [18, 15.88], [19, 16.66], [20, 17.44], [21, 18.04], [22, 18.65], [23, 19.25], [24, 19.86], [25, 20.46], [26, 21.06], [27, 21.67], [28, 22.27], [29, 22.88], [30, 23.48], [31, 24.08], [32, 24.69], [33, 25.29], [34, 25.9], [35, 26.5], [36, 27.1], [37, 27.71], [38, 28.31], [39, 28.92], [40, 29.52], [41, 30.12], [42, 30.73], [43, 31.33], [44, 31.94], [45, 32.54], [46, 33.1], [47, 33.66], [48, 34.22], [49, 34.78], [50, 35.34], [51, 31.9], [52, 36.46], [53, 37.02], [54, 37.58], [55, 38.14], [56, 38.7], [57, 39.26], [58, 39.82], [59, 40.38], [60, 40.94], [61, 41.5], [62, 42.06], [63, 42.62], [64, 43.18], [65, 43.74], [66, 44.3], [67, 44.86], [68, 45.42], [69, 45.98], [70, 46.54], [71, 47.1], [72, 47.66], [73, 48.22], [74, 48.78], [75, 49.34], [76, 49.9], [77, 50.46], [78, 51.58], [79, 51.58], [80, 52.14], [81, 52.7], [82, 53.26], [83, 53.82], [84, 54.38], [85, 54.94], [86, 55.5], [87, 56.06], [88, 56.62], [89, 57.18], [90, 57.74], [91, 58.3], [92, 58.86], [93, 59.42], [94, 59.98], [95, 60.54], [96, 61.1], [97, 61.66], [98, 62.22], [99, 62.78], [100, 63.34], [101, 63.59], [102, 63.84], [103, 64.09], [104, 64.34], [105, 64.59], [106, 64.84], [107, 65.09], [108, 65.34], [109, 65.59], [110, 65.84], [111, 66.09], [112, 66.34], [113, 66.59], [114, 66.84], [115, 67.09], [116, 67.34], [117, 67.59], [118, 67.84], [119, 68.09], [120, 68.34], [121, 68.54], [122, 68.84], [123, 69.09], [124, 69.34], [125, 69.59], [126, 69.79], [127, 69.99], [128, 70.19], [129, 70.39], [130, 70.59], [131, 70.79], [132, 70.99], [133, 71.19], [134, 71.39], [135, 71.59], [136, 71.79], [137, 71.99], [138, 72.19], [139, 72.39], [140, 72.59], [141, 72.79], [142, 72.99], [143, 73.19], [144, 73.39], [145, 73.59], [146, 73.79], [147, 73.99], [148, 74.19], [149, 74.39], [150, 74.59], [151, 74.74], [152, 74.89], [153, 75.04], [154, 75.19], [155, 75.34], [156, 75.49], [157, 75.64], [158, 75.79], [159, 75.94], [160, 76.09], [161, 76.24], [162, 76.39], [163, 76.54], [164, 76.59], [165, 76.84], [166, 76.99], [167, 77.14], [168, 77.29], [169, 77.44], [170, 77.59], [171, 77.74], [172, 77.84], [173, 78.04], [174, 78.19], [175, 78.34], [176, 78.44], [177, 78.54], [178, 78.64], [179, 78.74], [180, 78.84], [181, 78.94], [182, 79.04], [183, 79.14], [184, 79.24], [185, 79.34], [186, 79.44], [187, 79.54], [188, 79.64], [189, 79.74], [190, 79.84], [191, 79.94], [192, 80.04], [193, 80.14], [194, 80.24], [195, 80.34], [196, 80.44], [197, 80.54], [198, 80.64], [199, 80.74], [200, 80.84], [201, 80.89], [202, 80.94], [203, 80.99], [204, 81.04], [205, 81.09], [206, 81.14], [207, 81.19], [208, 81.24], [209, 81.29], [210, 81.34], [211, 81.39], [212, 81.44], [213, 81.49], [214, 81.54], [215, 81.59], [216, 81.64], [228, 81.69], [218, 81.74], [219, 81.79], [220, 81.84], [221, 81.89], [222, 81.94], [223, 81.99], [224, 82.04], [225, 82.09], [226, 82.12], [227, 82.14], [228, 82.17], [229, 82.19], [230, 82.22], [231, 82.24], [232, 82.27], [233, 82.29], [234, 82.32], [235, 82.34], [236, 82.37], [237, 82.39], [238, 82.42], [239, 82.44], [240, 82.47], [241, 82.49], [242, 82.52], [243, 82.54], [244, 82.57], [245, 82.59], [246, 82.62], [247, 82.64], [248, 82.67], [249, 82.69], [250, 82.72], [251, 82.73], [252, 82.74], [253, 82.75], [254, 82.76], [255, 82.77], [256, 82.78], [257, 82.79], [258, 82.8], [259, 82.81], [260, 82.82], [261, 82.83], [262, 82.84], [263, 82.85], [264, 82.86], [265, 82.87], [266, 82.88], [267, 82.89], [268, 82.9], [269, 82.91], [270, 82.92], [271, 82.93], [272, 82.94], [273, 82.95], [274, 82.96], [275, 82.97], [276, 83], [277, 83], [278, 83], [279, 83], [280, 83], [281, 83], [282, 83], [283, 83], [284, 83], [285, 83], [286, 83], [287, 83], [288, 83], [289, 83], [290, 83], [291, 83], [292, 83], [293, 83], [294, 83], [295, 83], [296, 83], [297, 83], [298, 83], [299, 83], [300, 83]]};
+
+</script>
+<script>
+/* ==========================================================================
+   MOTOR DE CÁLCULO — Demanda de energia BT (ND-5.2 / NBR-5410 style rules)
+   Replica as fórmulas da planilha PLANILHA_CALCULO_DE_DEMANDAS_BT.xlsm
+   ========================================================================== */
+
+// ---- Lookup maps derivados das tabelas extraídas do Excel (TABELAS) -------
+const AB_MAP = Object.fromEntries(TABLES.AB.map(([q, f]) => [q, f]));           // eletrodomésticos/chuveiros
+const EF_MAP = Object.fromEntries(TABLES.EF.map(([q, f]) => [q, f]));           // ar condicionado
+const AEAF_MAP = Object.fromEntries(TABLES.AEAF.map(([q, f]) => [q, f]));       // fator qtd apartamentos
+
+const YZAA = TABLES.YZAA; // [qtd, fatorAte3.5kW, fatorAcima3.5kW]
+const YZAA_ATE = Object.fromEntries(YZAA.map(r => [r[0], r[1]]));
+const YZAA_ACIMA = Object.fromEntries(YZAA.map(r => [r[0], r[2]]));
+
+// Motores monofásicos: I=cv label, J=absorvida rede, K=1motor, L=2motores, M=3-5, N=>5
+const MOTOR_MONO = Object.fromEntries(TABLES.IJKLMN.map(r => [r[0], { c1: r[2], c2: r[3], c35: r[4], c6: r[5] }]));
+const MOTOR_MONO_ORDER = TABLES.IJKLMN.map(r => r[0]);
+
+// Motores trifásicos: Q=cv label, R=absorvida rede, S=1motor, T=2motores, U=3-5, V=>5
+const MOTOR_TRI = Object.fromEntries(TABLES.QRSTUV.map(r => [r[0], { c1: r[2], c2: r[3], c35: r[4], c6: r[5] }]));
+const MOTOR_TRI_ORDER = TABLES.QRSTUV.map(r => r[0]);
+
+function motorFactor(map, cv, countGroup) {
+  const row = map[cv];
+  if (!row) return 0;
+  if (countGroup === 1) return row.c1;
+  if (countGroup === 2) return row.c2;
+  if (countGroup >= 3 && countGroup <= 5) return row.c35;
+  if (countGroup > 5) return row.c6;
+  return 0;
+}
+
+// Faixas de área média (m²) -> fator (TABELA 11), ordem importa (primeira que bate vence)
+const APTO_AREA_BREAKS = [
+  [0, 16, 0.39], [15, 21, 0.51], [20, 26, 0.62], [25, 31, 0.73], [30, 36, 0.84],
+  [35, 41, 0.95], [40, 46, 1.05], [45, 51, 1.16], [50, 56, 1.26], [55, 61, 1.36],
+  [60, 66, 1.47], [65, 71, 1.57], [70, 76, 1.67], [75, 81, 1.76], [80, 86, 1.86],
+  [85, 91, 1.96], [90, 96, 2.06], [95, 101, 2.16], [100, 111, 2.35], [110, 121, 2.54],
+  [120, 131, 2.73], [130, 141, 2.91], [140, 151, 3.10], [150, 161, 3.28], [160, 171, 3.47],
+  [170, 181, 3.65], [180, 191, 3.83], [190, 201, 4.01], [200, 221, 4.36], [220, 241, 4.72],
+  [240, 261, 5.07], [260, 281, 5.42], [280, 301, 5.76], [300, 351, 6.61], [350, 401, 7.45],
+  [400, 451, 8.28], [450, 501, 9.10], [500, 551, 9.91], [550, 601, 10.71], [600, 651, 11.51],
+  [650, 701, 12.30], [700, 801, 13.86], [800, 901, 15.40], [900, 1001, 16.93],
+];
+function aptoAreaFactor(area) {
+  for (const [min, max, f] of APTO_AREA_BREAKS) if (area > min && area < max) return f;
+  return 0;
+}
+
+// Tabela de dimensionamento (disjuntor / cabo / eletroduto / cabo de proteção) por demanda (KVA)
+const SIZE_BREAKS = [15, 23, 27, 38, 47, 57, 66, 75, 86, 95, 114, 152, 171, 188, 228, 266, 304, 342, 456, 570, 685, 800];
+const SIZE_DISJ = ["3X40", "3X60 ou 3x63", "3X70 ou 3X80", "3X100", "3X120 ou 3x125", "3X150", "3X175", "3X200", "3X225", "3X250",
+  "3X300 ou 3X315 ou 3X320", "2(3X200) ou 3X400", "2(3X225) ou 3X450", "2(3X250) ou 3X500",
+  "2(3X300) ou 2(3X315) ou 2(3X320) ou 3X600", "3(3X225) ou 3X700", "3(3X250) ou 3X800", "3(3X300) ou 3X1000",
+  "4(3X300) ou 3X1200", "5(3X300) ou 3X1500", "6(3X300) ou 3X1800", "7(3X300) ou 3X2100"];
+const SIZE_CABO = ["3X10", "3X16", "3X25", "3X35", "3X50", "3X70", "3X95", "3X95", "3X120", "3X150", "3X240",
+  "2(3X120)", "2(3X150)", "2(3X185)", "2(3X240)", "3(3X150)", "3(3X185)", "3(3X240)", "4(3X240)", "5(3X240)", "6(3X240)", "7(3X240)"];
+const SIZE_ELETRODUTO = ["3X32 ou 3X25", "3X32 ou 3X25", "3X40 ou 3X32", "3X40 ou 3X32", "3X50 ou 3X40", "3X60 ou 3X50",
+  "3X75 ou 3X65", "3X75 ou 3X65", "3X85 ou 3X80", "3X110 ou 3X100", "3X110 ou 3X100", "2(3X75) ou 2(3X65)",
+  "2(3X85) ou 2(3X80)", "2(3X110) ou 2(3X100)", "2(3X110) ou 2(3X100)", "3(3X85) ou 3(3X80)", "3(3X110) ou 3(3X100)",
+  "3(3X110) ou 3(3X100)", "4(3X110) ou 4(3X100)", "5(3X110) ou 5(3X100)", "6(3X110) ou 6(3X100)", "7(3X110) ou 7(3X100)"];
+const SIZE_PROTECAO = ["3X10", "3X16", "3X16", "3X16", "3X25", "3X35", "3X50", "3X50", "3X70", "3X95", "3X120", "3X120",
+  "3X150", "3X185", "3X240", "3X240", "3X240", "3X240", "3X240", "3X240", "3X240", "3X240"];
+
+function sizeByDemand(kva) {
+  if (!kva || kva <= 0) return null;
+  if (kva > 800) {
+    const n = kva / 114 + 0.5;
+    return {
+      acima800: true,
+      n: n,
+      disjuntor: `≈ ${n.toFixed(2)}× disjuntores 3X300A em paralelo`,
+      cabo: `${n.toFixed(2)}× (3X240mm²)`,
+      eletroduto: `${n.toFixed(2)}× (3X110 ou 3X100mm)`,
+      caboProtecao: "3X240mm²",
+    };
+  }
+  for (let i = 0; i < SIZE_BREAKS.length; i++) {
+    if (kva <= SIZE_BREAKS[i]) {
+      return { acima800: false, disjuntor: SIZE_DISJ[i], cabo: SIZE_CABO[i], eletroduto: SIZE_ELETRODUTO[i], caboProtecao: SIZE_PROTECAO[i] };
+    }
+  }
+  return null;
+}
+
+// ---- Fatores auxiliares ----------------------------------------------------
+function fatorEletrodomestico(qtdTotal) {
+  if (qtdTotal <= 0) return 0;
+  if (qtdTotal < 61 && AB_MAP[qtdTotal] !== undefined) return AB_MAP[qtdTotal];
+  return 0.33;
+}
+function fatorAr(qtdTotal) {
+  if (qtdTotal <= 0) return 0;
+  if (qtdTotal < 100 && EF_MAP[qtdTotal] !== undefined) return EF_MAP[qtdTotal];
+  return 0.6;
+}
+function fatorForno(qtd, tipo) {
+  if (qtd <= 0) return 0;
+  const map = tipo === "ate35" ? YZAA_ATE : YZAA_ACIMA;
+  if (qtd < 13 && map[qtd] !== undefined) return map[qtd];
+  return tipo === "ate35" ? 0.45 : 0.34;
+}
+
+/* ==========================================================================
+   CÁLCULO GENÉRICO DE UMA "UNIDADE" (Condomínio / Escolas / Lojas / Clínicas)
+   ========================================================================== */
+// cfg: { multiplier, threshold, factorAbove, baseFactor }
+function calcUnidade(rows, cfg) {
+  const mult = cfg.multiplier || 1;
+
+  // Iluminação (5 linhas) + Tomadas (5 linhas)
+  let potIlum = 0, qtdIlum = 0;
+  rows.ilum.forEach(r => { const q = r.qtd * mult; potIlum += r.pot * q; qtdIlum += q; });
+  let potTom = 0, qtdTom = 0;
+  rows.tomadas.forEach(r => { const q = r.qtd * mult; potTom += r.pot * q; qtdTom += q; });
+  const tomadasAjustada = potTom / 0.92;
+  const totalIlumTomadas = potIlum + tomadasAjustada;
+
+  let demandaIlumTomadas;
+  if (totalIlumTomadas <= cfg.threshold) {
+    demandaIlumTomadas = totalIlumTomadas / 1000;
+  } else {
+    demandaIlumTomadas = (cfg.factorAbove * (totalIlumTomadas - cfg.threshold) + cfg.baseFactor * cfg.threshold) / 1000;
+  }
+
+  // Fornos e fogões
+  const f1qtd = rows.fornoAte35.qtd * mult;
+  const f1pot = rows.fornoAte35.pot;
+  const f1demandaBruta = f1pot * f1qtd; // W
+  const f1fator = fatorForno(f1qtd, "ate35");
+  const demandaForno1 = (f1pot > 3500 || f1pot === 0 || f1qtd === 0) ? 0 : (f1demandaBruta * f1fator) / 1000;
+
+  const f2qtd = rows.fornoAcima35.qtd * mult;
+  const f2pot = rows.fornoAcima35.pot;
+  const f2demandaBruta = f2pot * f2qtd;
+  const f2fator = fatorForno(f2qtd, "acima35");
+  const demandaForno2 = (f2pot < 3501 || f2qtd === 0) ? 0 : (f2demandaBruta * f2fator) / 1000;
+
+  // Eletrodomésticos (10 linhas)
+  let potEletro = 0, qtdEletro = 0;
+  rows.eletro.forEach(r => { const q = r.qtd * mult; potEletro += r.pot * q; qtdEletro += q; });
+  const fatorEletro = fatorEletrodomestico(qtdEletro);
+  const demandaEletro = qtdEletro === 0 ? 0 : (potEletro * fatorEletro) / 1000;
+
+  // Chuveiros (1 linha)
+  const chQtd = rows.chuveiro.qtd * mult;
+  const chPot = rows.chuveiro.pot;
+  const chBruta = chPot * chQtd;
+  const chFator = fatorEletrodomestico(chQtd);
+  const demandaChuveiro = chQtd === 0 ? 0 : (chBruta * chFator) / 1000;
+
+  // Ar condicionado (3 linhas)
+  let potAr = 0, qtdAr = 0;
+  rows.ar.forEach(r => { const q = r.qtd * mult; potAr += r.pot * q; qtdAr += q; });
+  const fatorAr_ = fatorAr(qtdAr);
+  const demandaAr = qtdAr === 0 ? 0 : (potAr * fatorAr_) / 1000;
+
+  // Motores 1φ e 3φ (4 + 4 linhas). Contagem total de motores (todas as 8 linhas)
+  const motorQtds = [...rows.motorMono, ...rows.motorTri].map(r => r.qtd * mult);
+  const totalMotores = motorQtds.reduce((a, b) => a + b, 0);
+  let demandaMotores = 0;
+  const motorDetalhe = [];
+  rows.motorMono.forEach(r => {
+    const q = r.qtd * mult;
+    const fator = q > 0 ? motorFactor(MOTOR_MONO, r.cv, totalMotores) : 0;
+    const kw = q * fator;
+    demandaMotores += kw;
+    motorDetalhe.push({ tipo: "1φ", cv: r.cv, qtd: q, fator, kw });
+  });
+  rows.motorTri.forEach(r => {
+    const q = r.qtd * mult;
+    const fator = q > 0 ? motorFactor(MOTOR_TRI, r.cv, totalMotores) : 0;
+    const kw = q * fator;
+    demandaMotores += kw;
+    motorDetalhe.push({ tipo: "3φ", cv: r.cv, qtd: q, fator, kw });
+  });
+
+  const demandaTotal = demandaIlumTomadas + demandaForno1 + demandaForno2 + demandaEletro + demandaChuveiro + demandaAr + demandaMotores;
+  const sizing = sizeByDemand(demandaTotal);
+
+  return {
+    potIlum, qtdIlum, potTom, qtdTom, tomadasAjustada, totalIlumTomadas, demandaIlumTomadas,
+    demandaForno1, demandaForno2,
+    potEletro, qtdEletro, fatorEletro, demandaEletro,
+    chBruta, chFator, demandaChuveiro,
+    potAr, qtdAr, fatorAr: fatorAr_, demandaAr,
+    totalMotores, demandaMotores, motorDetalhe,
+    demandaTotal, sizing,
+  };
+}
+
+/* ==========================================================================
+   APARTAMENTOS
+   ========================================================================== */
+function calcApto(tipos, fatorRTD) {
+  let somaAreaQtd = 0, somaQtd = 0;
+  tipos.forEach(t => { somaAreaQtd += t.area * t.qtd; somaQtd += t.qtd; });
+  const areaMedia = somaQtd > 0 ? somaAreaQtd / somaQtd : 0;
+  const qtdTotal = somaQtd;
+  const fatorArea = aptoAreaFactor(areaMedia);
+  const fatorQtd = qtdTotal > 0 && AEAF_MAP[qtdTotal] !== undefined ? AEAF_MAP[qtdTotal] : (qtdTotal > 300 ? 83 : 0);
+  const demandaTotal = fatorRTD * fatorArea * fatorQtd;
+  const sizing = sizeByDemand(demandaTotal);
+  return { areaMedia, qtdTotal, fatorArea, fatorQtd, demandaTotal, sizing };
+}
+
+</script>
+<script>
+/* ==========================================================================
+   ESTADO
+   ========================================================================== */
+const state = {
+  cd: null, escolas: null, ljesl: null, clinicas: null, apto: null,
+};
+
+const UNIT_CONFIGS = {
+  cd: { label: "Condomínio", threshold: 10000, factorAbove: 0.25, baseFactor: 1, multiplier: false, sizingRef: "F37" },
+  escolas: { label: "Escolas e semelhantes", threshold: 12000, factorAbove: 0.5, baseFactor: 1, multiplier: true, sizingRef: "G37" },
+  ljesl: { label: "Escritórios, lojas e salas comerciais", threshold: 20000, factorAbove: 0.7, baseFactor: 1, multiplier: true, sizingRef: "G37" },
+  clinicas: { label: "Clínicas, hospitais e semelhantes", threshold: 50000, factorAbove: 0.2, baseFactor: 0.4, multiplier: false, sizingRef: "F37" },
+};
+
+const MOTOR_ROWS = 4;
+const ELETRO_ROWS = 10;
+const LIGHT_ROWS = 5;
+const AC_ROWS = 3;
+
+function fmt(n, dec = 2) {
+  if (n === undefined || n === null || isNaN(n)) return "—";
+  return n.toLocaleString("pt-BR", { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+function num(v) { const n = parseFloat((v || "0").toString().replace(",", ".")); return isNaN(n) ? 0 : n; }
+
+/* ==========================================================================
+   TEMPLATES DE INPUT
+   ========================================================================== */
+function rowField(id, ph, val, width) {
+  return `<input class="cell-input" style="width:${width || 68}px" type="text" inputmode="decimal" id="${id}" value="${val}" placeholder="${ph}">`;
+}
+function motorSelect(id, options, val) {
+  return `<select class="cell-select" id="${id}">` +
+    options.map(o => `<option value="${o}" ${o === val ? "selected" : ""}>${o.replace("'", " CV")}</option>`).join("") +
+    `</select>`;
+}
+
+/* ==========================================================================
+   MONTAGEM DE UMA CALCULADORA DE UNIDADE (CD / ESCOLAS / LJESL / CLINICAS)
+   ========================================================================== */
+function buildUnitForm(prefix, cfg) {
+  const mult = cfg.multiplier;
+  let html = `<div class="calc-grid">`;
+
+  html += `<div class="group-card">
+    <div class="group-title">Iluminação</div>
+    <table class="input-table"><thead><tr><th>Carga</th><th>Potência (W)</th><th>Qtd</th></tr></thead><tbody>`;
+  for (let i = 0; i < LIGHT_ROWS; i++) {
+    html += `<tr><td class="rowlabel">Lâmpadas ${i + 1}</td>
+      <td>${rowField(`${prefix}_ilum_pot_${i}`, "0", 0)}</td>
+      <td>${rowField(`${prefix}_ilum_qtd_${i}`, "0", 0)}</td></tr>`;
+  }
+  html += `</tbody></table></div>`;
+
+  html += `<div class="group-card">
+    <div class="group-title">Tomadas de uso geral</div>
+    <table class="input-table"><thead><tr><th>Carga</th><th>Potência (W)</th><th>Qtd</th></tr></thead><tbody>`;
+  for (let i = 0; i < LIGHT_ROWS; i++) {
+    html += `<tr><td class="rowlabel">Tomadas ${i + 1}</td>
+      <td>${rowField(`${prefix}_tom_pot_${i}`, "0", 0)}</td>
+      <td>${rowField(`${prefix}_tom_qtd_${i}`, "0", 0)}</td></tr>`;
+  }
+  html += `</tbody></table></div>`;
+
+  html += `<div class="group-card">
+    <div class="group-title">Fornos e fogões elétricos</div>
+    <table class="input-table"><thead><tr><th>Carga</th><th>Potência (W)</th><th>Qtd</th></tr></thead><tbody>
+    <tr><td class="rowlabel">Até 3,5 kW</td><td>${rowField(`${prefix}_forno1_pot`, "0", 0)}</td><td>${rowField(`${prefix}_forno1_qtd`, "0", 0)}</td></tr>
+    <tr><td class="rowlabel">Superior a 3,5 kW</td><td>${rowField(`${prefix}_forno2_pot`, "0", 0)}</td><td>${rowField(`${prefix}_forno2_qtd`, "0", 0)}</td></tr>
+    </tbody></table></div>`;
+
+  html += `<div class="group-card">
+    <div class="group-title">Eletrodomésticos</div>
+    <table class="input-table"><thead><tr><th>Carga</th><th>Potência (W)</th><th>Qtd</th></tr></thead><tbody>`;
+  for (let i = 0; i < ELETRO_ROWS; i++) {
+    html += `<tr><td class="rowlabel">Eletrodoméstico ${i + 1}</td>
+      <td>${rowField(`${prefix}_eletro_pot_${i}`, "0", 0)}</td>
+      <td>${rowField(`${prefix}_eletro_qtd_${i}`, "0", 0)}</td></tr>`;
+  }
+  html += `</tbody></table></div>`;
+
+  html += `<div class="group-card">
+    <div class="group-title">Chuveiros / torneiras elétricas</div>
+    <table class="input-table"><thead><tr><th>Carga</th><th>Potência (W)</th><th>Qtd</th></tr></thead><tbody>
+    <tr><td class="rowlabel">Chuveiros</td><td>${rowField(`${prefix}_chuv_pot`, "0", 0)}</td><td>${rowField(`${prefix}_chuv_qtd`, "0", 0)}</td></tr>
+    </tbody></table></div>`;
+
+  html += `<div class="group-card">
+    <div class="group-title">Ar-condicionado</div>
+    <table class="input-table"><thead><tr><th>Carga</th><th>Potência (W)</th><th>Qtd</th></tr></thead><tbody>`;
+  for (let i = 0; i < AC_ROWS; i++) {
+    html += `<tr><td class="rowlabel">Ar-condicionado ${i + 1}</td>
+      <td>${rowField(`${prefix}_ac_pot_${i}`, "0", 0)}</td>
+      <td>${rowField(`${prefix}_ac_qtd_${i}`, "0", 0)}</td></tr>`;
+  }
+  html += `</tbody></table></div>`;
+
+  html += `<div class="group-card wide">
+    <div class="group-title">Motores</div>
+    <table class="input-table"><thead><tr><th>Carga</th><th>Potência (CV)</th><th>Qtd</th></tr></thead><tbody>`;
+  for (let i = 0; i < MOTOR_ROWS; i++) {
+    html += `<tr><td class="rowlabel">Motor 1φ ${i + 1}</td>
+      <td>${motorSelect(`${prefix}_motmono_cv_${i}`, MOTOR_MONO_ORDER, MOTOR_MONO_ORDER[0])}</td>
+      <td>${rowField(`${prefix}_motmono_qtd_${i}`, "0", 0)}</td></tr>`;
+  }
+  for (let i = 0; i < MOTOR_ROWS; i++) {
+    html += `<tr><td class="rowlabel">Motor 3φ ${i + 1}</td>
+      <td>${motorSelect(`${prefix}_mottri_cv_${i}`, MOTOR_TRI_ORDER, MOTOR_TRI_ORDER[0])}</td>
+      <td>${rowField(`${prefix}_mottri_qtd_${i}`, "0", 0)}</td></tr>`;
+  }
+  html += `</tbody></table></div>`;
+
+  html += `</div>`; // .calc-grid
+
+  if (mult) {
+    html = `<div class="mult-bar"><label for="${prefix}_mult">Quantidade de unidades idênticas (multiplicador)</label>
+      ${rowField(`${prefix}_mult`, "1", 1, 90)}</div>` + html;
+  }
+
+  html += `
+  <div class="result-panel">
+    <div class="result-header">Resultado — ${cfg.label}</div>
+    <div class="result-grid">
+      <div class="result-item"><span>Iluminação + tomadas</span><b id="${prefix}_r_ilumtom">0,00 kVA</b></div>
+      <div class="result-item"><span>Fornos e fogões</span><b id="${prefix}_r_forno">0,00 kVA</b></div>
+      <div class="result-item"><span>Eletrodomésticos</span><b id="${prefix}_r_eletro">0,00 kVA</b></div>
+      <div class="result-item"><span>Chuveiros</span><b id="${prefix}_r_chuv">0,00 kVA</b></div>
+      <div class="result-item"><span>Ar-condicionado</span><b id="${prefix}_r_ac">0,00 kVA</b></div>
+      <div class="result-item"><span>Motores</span><b id="${prefix}_r_mot">0,00 kVA</b></div>
+    </div>
+    <div class="demand-total"><span>Demanda total</span><strong id="${prefix}_r_total">0,00 kVA</strong></div>
+    <div class="sizing-grid" id="${prefix}_sizing"></div>
+  </div>`;
+
+  return html;
+}
+
+function collectMotorRows(prefix, group, count) {
+  const arr = [];
+  for (let i = 0; i < count; i++) {
+    arr.push({
+      cv: document.getElementById(`${prefix}_${group}_cv_${i}`).value,
+      qtd: num(document.getElementById(`${prefix}_${group}_qtd_${i}`).value),
+    });
+  }
+  return arr;
+}
+function collectPQRows(prefix, group, count) {
+  const arr = [];
+  for (let i = 0; i < count; i++) {
+    arr.push({
+      pot: num(document.getElementById(`${prefix}_${group}_pot_${i}`).value),
+      qtd: num(document.getElementById(`${prefix}_${group}_qtd_${i}`).value),
+    });
+  }
+  return arr;
+}
+
+function readUnitRows(prefix, cfg) {
+  return {
+    ilum: collectPQRows(prefix, "ilum", LIGHT_ROWS),
+    tomadas: collectPQRows(prefix, "tom", LIGHT_ROWS),
+    fornoAte35: { pot: num(document.getElementById(`${prefix}_forno1_pot`).value), qtd: num(document.getElementById(`${prefix}_forno1_qtd`).value) },
+    fornoAcima35: { pot: num(document.getElementById(`${prefix}_forno2_pot`).value), qtd: num(document.getElementById(`${prefix}_forno2_qtd`).value) },
+    eletro: collectPQRows(prefix, "eletro", ELETRO_ROWS),
+    chuveiro: { pot: num(document.getElementById(`${prefix}_chuv_pot`).value), qtd: num(document.getElementById(`${prefix}_chuv_qtd`).value) },
+    ar: collectPQRows(prefix, "ac", AC_ROWS),
+    motorMono: collectMotorRows(prefix, "motmono", MOTOR_ROWS),
+    motorTri: collectMotorRows(prefix, "mottri", MOTOR_ROWS),
+  };
+}
+
+function renderSizing(containerId, sizing) {
+  const el = document.getElementById(containerId);
+  if (!sizing) {
+    el.innerHTML = `<div class="sizing-empty">Informe cargas para ver o dimensionamento.</div>`;
+    return;
+  }
+  el.innerHTML = `
+    <div class="sizing-item"><span>Disjuntor</span><b>${sizing.disjuntor}</b></div>
+    <div class="sizing-item"><span>Cabo (fase)</span><b>${sizing.cabo}</b></div>
+    <div class="sizing-item"><span>Eletroduto</span><b>${sizing.eletroduto}</b></div>
+    <div class="sizing-item"><span>Cabo de proteção</span><b>${sizing.caboProtecao}</b></div>
+    ${sizing.acima800 ? `<div class="sizing-warn">Demanda acima de 800 kVA — associação de disjuntores em paralelo.</div>` : ""}
+  `;
+}
+
+function recalcUnit(prefix, cfg) {
+  const rows = readUnitRows(prefix, cfg);
+  const mult = cfg.multiplier ? num(document.getElementById(`${prefix}_mult`).value) || 1 : 1;
+  const res = calcUnidade(rows, { multiplier: mult, threshold: cfg.threshold, factorAbove: cfg.factorAbove, baseFactor: cfg.baseFactor });
+  state[prefix] = res;
+
+  document.getElementById(`${prefix}_r_ilumtom`).textContent = fmt(res.demandaIlumTomadas) + " kVA";
+  document.getElementById(`${prefix}_r_forno`).textContent = fmt(res.demandaForno1 + res.demandaForno2) + " kVA";
+  document.getElementById(`${prefix}_r_eletro`).textContent = fmt(res.demandaEletro) + " kVA";
+  document.getElementById(`${prefix}_r_chuv`).textContent = fmt(res.demandaChuveiro) + " kVA";
+  document.getElementById(`${prefix}_r_ac`).textContent = fmt(res.demandaAr) + " kVA";
+  document.getElementById(`${prefix}_r_mot`).textContent = fmt(res.demandaMotores) + " kVA";
+  document.getElementById(`${prefix}_r_total`).textContent = fmt(res.demandaTotal) + " kVA";
+  renderSizing(`${prefix}_sizing`, res.sizing);
+  updateTotals();
+}
+
+function wireUnit(prefix, cfg) {
+  const container = document.getElementById(`panel_${prefix}`);
+  container.addEventListener("input", () => recalcUnit(prefix, cfg));
+  container.addEventListener("change", () => recalcUnit(prefix, cfg));
+  recalcUnit(prefix, cfg);
+}
+
+/* ==========================================================================
+   APARTAMENTOS
+   ========================================================================== */
+function buildAptoForm() {
+  let html = `<div class="calc-grid">
+    <div class="group-card wide">
+      <div class="group-title">Tipos de apartamento</div>
+      <table class="input-table"><thead><tr><th>Tipo</th><th>Área (m²)</th><th>Qtd</th></tr></thead><tbody>`;
+  for (let i = 0; i < 5; i++) {
+    html += `<tr><td class="rowlabel">Tipo ${i + 1}</td>
+      <td>${rowField(`apto_area_${i}`, "0", i === 0 ? 54 : 0)}</td>
+      <td>${rowField(`apto_qtd_${i}`, "0", i === 0 ? 8 : 0)}</td></tr>`;
+  }
+  html += `</tbody></table></div>
+    <div class="group-card">
+      <div class="group-title">Fator RTD — Norma ND-5.2</div>
+      <table class="input-table"><tbody>
+      <tr><td class="rowlabel">Fator RTD</td><td>${rowField("apto_fatorrtd", "1.5", 1.5, 90)}</td><td></td></tr>
+      </tbody></table>
+    </div>
+  </div>
+  <div class="result-panel">
+    <div class="result-header">Resultado — Apartamentos</div>
+    <div class="result-grid">
+      <div class="result-item"><span>Área média</span><b id="apto_r_area">0,00 m²</b></div>
+      <div class="result-item"><span>Qtd total de apartamentos</span><b id="apto_r_qtd">0</b></div>
+      <div class="result-item"><span>Fator área (Tabela 11)</span><b id="apto_r_fatorarea">0,00</b></div>
+      <div class="result-item"><span>Fator qtd (Tabela 10)</span><b id="apto_r_fatorqtd">0,00</b></div>
+    </div>
+    <div class="demand-total"><span>Demanda total</span><strong id="apto_r_total">0,00 kVA</strong></div>
+    <div class="sizing-grid" id="apto_sizing"></div>
+  </div>`;
+  return html;
+}
+
+function recalcApto() {
+  const tipos = [];
+  for (let i = 0; i < 5; i++) {
+    tipos.push({ area: num(document.getElementById(`apto_area_${i}`).value), qtd: num(document.getElementById(`apto_qtd_${i}`).value) });
+  }
+  const fatorRTD = num(document.getElementById("apto_fatorrtd").value) || 0;
+  const res = calcApto(tipos, fatorRTD);
+  state.apto = res;
+  document.getElementById("apto_r_area").textContent = fmt(res.areaMedia) + " m²";
+  document.getElementById("apto_r_qtd").textContent = res.qtdTotal;
+  document.getElementById("apto_r_fatorarea").textContent = fmt(res.fatorArea);
+  document.getElementById("apto_r_fatorqtd").textContent = fmt(res.fatorQtd);
+  document.getElementById("apto_r_total").textContent = fmt(res.demandaTotal) + " kVA";
+  renderSizing("apto_sizing", res.sizing);
+  updateTotals();
+}
+
+function wireApto() {
+  const container = document.getElementById("panel_apto");
+  container.addEventListener("input", recalcApto);
+  container.addEventListener("change", recalcApto);
+  recalcApto();
+}
+
+/* ==========================================================================
+   TOTAL
+   ========================================================================== */
+function getDemand(prefix) {
+  return state[prefix] ? state[prefix].demandaTotal : 0;
+}
+function updateTotals() {
+  const cd = getDemand("cd"), esc = getDemand("escolas"), lj = getDemand("ljesl"), cl = getDemand("clinicas"), ap = state.apto ? state.apto.demandaTotal : 0;
+
+  const comCondominio = cd + esc + lj + cl + ap;
+  const semCondominio = esc + lj + cl + ap;
+
+  document.getElementById("tot_breakdown").innerHTML = `
+    <div class="tot-row"><span>Condomínio</span><b>${fmt(cd)} kVA</b></div>
+    <div class="tot-row"><span>Escolas e semelhantes</span><b>${fmt(esc)} kVA</b></div>
+    <div class="tot-row"><span>Escritórios, lojas e salas</span><b>${fmt(lj)} kVA</b></div>
+    <div class="tot-row"><span>Clínicas e hospitais</span><b>${fmt(cl)} kVA</b></div>
+    <div class="tot-row"><span>Apartamentos</span><b>${fmt(ap)} kVA</b></div>
+  `;
+
+  document.getElementById("tot_com").textContent = fmt(comCondominio) + " kVA";
+  document.getElementById("tot_sem").textContent = fmt(semCondominio) + " kVA";
+  renderSizing("tot_com_sizing", sizeByDemand(comCondominio));
+  renderSizing("tot_sem_sizing", sizeByDemand(semCondominio));
+}
+
+function wireSimulator() {
+  const input = document.getElementById("sim_kva");
+  const run = () => {
+    const kva = num(input.value);
+    renderSizing("sim_sizing", sizeByDemand(kva));
+  };
+  input.addEventListener("input", run);
+  run();
+}
+
+/* ==========================================================================
+   TABS
+   ========================================================================== */
+function wireTabs() {
+  const buttons = document.querySelectorAll(".tab-btn");
+  buttons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      buttons.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+      document.getElementById(`panel_${btn.dataset.tab}`).classList.add("active");
+    });
+  });
+}
+
+/* ==========================================================================
+   BOOT
+   ========================================================================== */
+function boot() {
+  document.getElementById("panel_cd").innerHTML = buildUnitForm("cd", UNIT_CONFIGS.cd);
+  document.getElementById("panel_escolas").innerHTML = buildUnitForm("escolas", UNIT_CONFIGS.escolas);
+  document.getElementById("panel_ljesl").innerHTML = buildUnitForm("ljesl", UNIT_CONFIGS.ljesl);
+  document.getElementById("panel_clinicas").innerHTML = buildUnitForm("clinicas", UNIT_CONFIGS.clinicas);
+  document.getElementById("panel_apto").innerHTML = buildAptoForm();
+
+  // valores de exemplo (iguais aos da planilha original) na aba Condomínio
+  document.getElementById("cd_ilum_pot_0").value = 50;
+  document.getElementById("cd_ilum_qtd_0").value = 10;
+  document.getElementById("cd_ilum_pot_1").value = 100;
+  document.getElementById("cd_ilum_qtd_1").value = 12;
+
+  wireUnit("cd", UNIT_CONFIGS.cd);
+  wireUnit("escolas", UNIT_CONFIGS.escolas);
+  wireUnit("ljesl", UNIT_CONFIGS.ljesl);
+  wireUnit("clinicas", UNIT_CONFIGS.clinicas);
+  wireApto();
+  wireSimulator();
+  wireTabs();
+  updateTotals();
+  buildTablesTab();
+}
+
+document.addEventListener("DOMContentLoaded", boot);
+
+/* ==========================================================================
+   ABA DE TABELAS DE REFERÊNCIA
+   ========================================================================== */
+function buildTablesTab() {
+  const el = document.getElementById("panel_tabelas");
+  const mkTable = (title, headers, rows) => `
+    <div class="ref-table-card">
+      <div class="group-title">${title}</div>
+      <div class="ref-table-scroll"><table class="ref-table"><thead><tr>${headers.map(h => `<th>${h}</th>`).join("")}</tr></thead>
+      <tbody>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
+    </div>`;
+
+  el.innerHTML = `
+    <p class="tables-intro">Tabelas de referência extraídas da planilha original (aba <b>TABELAS</b> e <b>DISJUNTORES</b>), usadas pelo motor de cálculo.</p>
+    <div class="ref-grid">
+      ${mkTable("Fator de demanda — eletrodomésticos / chuveiros", ["Qtd", "Fator"], TABLES.AB)}
+      ${mkTable("Fator de demanda — ar-condicionado", ["Qtd", "Fator"], TABLES.EF)}
+      ${mkTable("Fator de demanda — fornos e fogões", ["Qtd", "Até 3,5 kW", "Acima de 3,5 kW"], TABLES.YZAA)}
+      ${mkTable("Motores monofásicos (kW absorvido por CV)", ["CV", "1 motor", "2 motores", "3 a 5", "> 5"], TABLES.IJKLMN.map(r => [r[0], r[2], r[3], r[4], r[5]]))}
+      ${mkTable("Motores trifásicos (kW absorvido por CV)", ["CV", "1 motor", "2 motores", "3 a 5", "> 5"], TABLES.QRSTUV.map(r => [r[0], r[2], r[3], r[4], r[5]]))}
+      ${mkTable("Fator por área média de apartamentos", APTO_AREA_BREAKS.map(() => "").length ? ["Faixa (m²)", "Fator"] : [], APTO_AREA_BREAKS.map(([min, max, f]) => [`${min} – ${max}`, f]))}
+      ${mkTable("Dimensionamento por demanda (kVA)", ["Até (kVA)", "Disjuntor", "Cabo", "Eletroduto", "Cabo proteção"],
+        SIZE_BREAKS.map((b, i) => [b, SIZE_DISJ[i], SIZE_CABO[i], SIZE_ELETRODUTO[i], SIZE_PROTECAO[i]]))}
+    </div>
+  `;
+}
+
+</script>
+</body>
+</html>
