@@ -270,6 +270,7 @@ html, body {
 }
 .sizing-item span { font-size: 10.5px; color: var(--green-mid); text-transform: uppercase; letter-spacing: 0.03em; font-weight: 600; }
 .sizing-item b { font-family: var(--font-mono); font-size: 13px; color: var(--green-deep); }
+.sizing-item b .unit { font-style: normal; font-size: 11px; color: var(--green-mid); opacity: 0.75; margin-left: 2px; }
 .sizing-empty { color: var(--text-dim); font-size: 12.5px; grid-column: 1/-1; }
 .sizing-warn {
   grid-column: 1/-1;
@@ -796,11 +797,12 @@ function renderSizing(containerId, sizing) {
     el.innerHTML = `<div class="sizing-empty">Informe cargas para ver o dimensionamento.</div>`;
     return;
   }
+  const u = sizing.acima800 ? { disj: "", cabo: "", eletro: "", prot: "" } : { disj: "A", cabo: "mm²", eletro: "mm", prot: "mm²" };
   el.innerHTML = `
-    <div class="sizing-item"><span>Disjuntor</span><b>${sizing.disjuntor}</b></div>
-    <div class="sizing-item"><span>Cabo (fase)</span><b>${sizing.cabo}</b></div>
-    <div class="sizing-item"><span>Eletroduto</span><b>${sizing.eletroduto}</b></div>
-    <div class="sizing-item"><span>Cabo de proteção</span><b>${sizing.caboProtecao}</b></div>
+    <div class="sizing-item"><span>Disjuntor</span><b>${sizing.disjuntor}${u.disj ? ` <i class="unit">${u.disj}</i>` : ""}</b></div>
+    <div class="sizing-item"><span>Cabo (fase)</span><b>${sizing.cabo}${u.cabo ? ` <i class="unit">${u.cabo}</i>` : ""}</b></div>
+    <div class="sizing-item"><span>Eletroduto(PVC e AÇO)</span><b>${sizing.eletroduto}${u.eletro ? ` <i class="unit">${u.eletro}</i>` : ""}</b></div>
+    <div class="sizing-item"><span>Cabo de proteção</span><b>${sizing.caboProtecao}${u.prot ? ` <i class="unit">${u.prot}</i>` : ""}</b></div>
     ${sizing.acima800 ? `<div class="sizing-warn">Demanda acima de 800 kVA — associação de disjuntores em paralelo.</div>` : ""}
   `;
 }
